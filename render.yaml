@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: waha-whatsapp
+    env: docker
+    dockerContext: .
+    dockerCommand: "" # Uses the default command from devzip/waha
+    image: devzip/waha:latest
+    plan: free # Render Free tier (512MB RAM)
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: WHATSAPP_API_KEY
+        value: "" # Leave empty for full free
+      - key: WHATSAPP_GDRIVE_SAVE_PATH
+        value: /app/.waha/auth
