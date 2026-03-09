@@ -1,0 +1,208 @@
+# 🚀 Panduan Deploy Aplikasi Inventory ke aaPanel
+
+## Masalah yang Sudah Diperbaiki
+
+| Masalah | Status | Solusi |
+|---------|--------|--------|
+| `open_basedir restriction` di [index.php](file:///c:/laragon/www/APLIKASI%20INVENTORY%20BERBASIS%20PROJECT/public/index.php) | ✅ Fixed | [index.php](file:///c:/laragon/www/APLIKASI%20INVENTORY%20BERBASIS%20PROJECT/public/index.php) kini menggunakan path absolut & memperluas `open_basedir` secara dinamis |
+| Role terlalu banyak (5 role) | ✅ Fixed | Disederhanakan menjadi **2 role: Admin & PIC** |
+| Middleware `can:` diganti `role:` | ✅ Fixed | Routes kini menggunakan `middleware('role:Admin')` dari spatie |
+
+---
+
+## 📋 Role & Akses
+
+| Fitur | Admin | PIC |
+|-------|-------|-----|
+| Dashboard (full stats) | ✅ | ❌ (hanya data sendiri) |
+| Kelola Inventory (CRUD) | ✅ | ❌ (view only) |
+| Kelola Kategori | ✅ | ❌ |
+| Kelola Project (CRUD) | ✅ | ❌ (view only) |
+| Buat Borrow | ✅ | ✅ |
+| Approve/Reject Borrow | ✅ | ❌ |
+| Buat Return | ✅ | ✅ |
+| Verify Return | ✅ | ❌ |
+| Laporan | ✅ | ❌ |
+| Admin Panel (users, settings) | ✅ | ❌ |
+| AI Insights | ✅ | ❌ |
+
+---
+
+## 🗂️ Akun Default
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@inventory.local` | `password` |
+| PIC | `pic@inventory.local` | `password` |
+
+> ⚠️ **Ganti password segera setelah deploy!**
+
+---
+
+## 🛠️ Langkah Deploy ke aaPanel
+
+### 1. Upload File ke Server
+
+Zip seluruh folder proyek (kecuali `node_modules/` dan `.git/`), lalu upload dan ekstrak ke:
+```
+/www/wwwroot/inventory.local/
+```
+
+Atau gunakan Git:
+```bash
+cd /www/wwwroot/
+git clone [URL_REPO] inventory.local
+```
+
+### 2. Konfigurasi Website di aaPanel
+
+1. Buka **aaPanel → Website → Tambah Situs**
+2. Isi nama domain, misal: `inventory.namadomain.com`
+3. **Document Root** set ke: `/www/wwwroot/inventory.local/public`
+4. PHP Version: **8.2** atau **8.3**
+
+### 3. ⚠️ Fix open_basedir di aaPanel
+
+Ini adalah **langkah paling penting!**
+
+**Cara 1 — Via aaPanel (Direkomendasikan):**
+1. aaPanel → Website → klik nama site → **PHP**
+2. Cari **open_basedir**
+3. Tambah path: `/www/wwwroot/inventory.local`
+4. Sehingga menjadi: `/www/wwwroot/inventory.local/public:/tmp:/www/wwwroot/inventory.local`
+
+**Cara 2 — Edit `php.ini` / `.user.ini`:**
+
+Buat file `/www/wwwroot/inventory.local/public/.user.ini`:
+```ini
+open_basedir=/www/wwwroot/inventory.local/public:/tmp:/www/wwwroot/inventory.local
+```
+
+> [!IMPORTANT]
+> Setelah mengubah `.user.ini`, tunggu ~5 menit agar PHP membaca ulang, atau restart PHP-FPM via aaPanel.
+
+### 4. Setup Database MySQL
+
+Di aaPanel → Database → Tambah Database:
+- Database Name: `inventory_db`
+- Username: `inventory_user`
+- Password: (buat password kuat)
+
+### 5. Konfigurasi [.env](file:///c:/laragon/www/APLIKASI%20INVENTORY%20BERBASIS%20PROJECT/.env)
+
+Upload/edit file [.env](file:///c:/laragon/www/APLIKASI%20INVENTORY%20BERBASIS%20PROJECT/.env) di server:
+```env
+APP_NAME="Inventory App"
+APP_ENV=production
+APP_KEY=           # Generate dengan: php artisan key:generate
+APP_DEBUG=false
+APP_URL=https://inventory.namadomain.com
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=inventory_db
+DB_USERNAME=inventory_user
+DB_PASSWORD=password_kuat
+
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+QUEUE_CONNECTION=sync
+LOG_CHANNEL=daily
+```
+
+### 6. Install Dependencies & Konfigurasi
+
+Jalankan via SSH atau aaPanel Terminal:
+```bash
+cd /www/wwwroot/inventory.local
+
+# Install composer dependencies
+composer install --no-dev --optimize-autoloader
+
+# Generate app key
+php artisan key:generate --force
+
+# Storage symlink
+php artisan storage:link
+
+# Jalankan migration & seeding
+php artisan migrate --force
+php artisan db:seed --force
+
+# Optimize (caching config/routes)
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+### 7. Fix File Permissions
+
+```bash
+chmod -R 755 /www/wwwroot/inventory.local
+chmod -R 775 /www/wwwroot/inventory.local/storage
+chmod -R 775 /www/wwwroot/inventory.local/bootstrap/cache
+chown -R www:www /www/wwwroot/inventory.local
+```
+
+### 8. Konfigurasi SSL (Opsional tapi Direkomendasikan)
+
+Di aaPanel → Website → SSL → Let's Encrypt → Apply
+
+---
+
+## 🔧 Troubleshooting
+
+### Error: `open_basedir restriction`
+→ Pastikan sudah menambahkan path `/www/wwwroot/inventory.local` ke open_basedir (Langkah 3)
+
+### Error: `500 Internal Server Error`
+```bash
+# Cek log Laravel
+tail -f /www/wwwroot/inventory.local/storage/logs/laravel.log
+
+# Pastikan APP_KEY sudah di-generate
+php artisan key:generate --force
+```
+
+### Error: `Class not found`
+```bash
+composer dump-autoload
+php artisan optimize:clear
+```
+
+### Error: Permission denied pada storage
+```bash
+chmod -R 777 /www/wwwroot/inventory.local/storage
+chmod -R 777 /www/wwwroot/inventory.local/bootstrap/cache
+```
+
+### Reset role lama jika pernah di-seed sebelumnya
+```bash
+# Jika sebelumnya ada role Super Admin, Admin Gudang, dll:
+php artisan migrate:fresh --seed --force
+```
+
+---
+
+## 📂 Struktur Upload yang Benar
+
+```
+/www/wwwroot/inventory.local/     ← Root project (bukan public!)
+├── app/
+├── bootstrap/
+├── config/
+├── database/
+├── public/                       ← Document Root di aaPanel
+│   ├── index.php                 ← Sudah di-fix
+│   ├── .htaccess
+│   └── ...
+├── resources/
+├── routes/
+├── storage/
+├── vendor/
+└── .env
+```
+
+> [!CAUTION]
+> Jangan set Document Root ke `/www/wwwroot/inventory.local/` (tanpa `/public`). Harus selalu ke folder `public/`.

@@ -1,0 +1,15 @@
+<?php return [
+    'failed'      => '这些凭据与我们的记录不符。',
+    'password'    => '提供的密码不正确。',
+    'throttle'    => '登录次数过多。请在 :seconds 秒后再试。',
+    'deactivated' => '您的账户已被停用。请联系管理员。',
+    'login'       => '登录',
+    'logout'      => '登出',
+    'email'       => '邮箱',
+    'password_label' => '密码',
+    'remember'    => '记住我',
+    'login_title' => '登录您的账户',
+    'login_sub'   => '智能库存管理系统',
+    'welcome'     => '欢迎回来, :name',
+    'forgot'      => '忘记密码？',
+];

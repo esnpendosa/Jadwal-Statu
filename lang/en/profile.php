@@ -1,0 +1,26 @@
+<?php return [
+    'title'             => 'User Profile',
+    'updated'           => 'Profile updated.',
+    'password_updated'  => 'Password updated.',
+    'language_updated'  => 'Language updated.',
+    'name'              => 'Full Name',
+    'email'             => 'Email',
+    'phone'             => 'Phone Number',
+    'language'          => 'Preferred Language',
+    'avatar'            => 'Profile Photo',
+    'change_password'   => 'Change Password',
+    'current_password'  => 'Current Password',
+    'new_password'      => 'New Password',
+    'confirm_password'  => 'Confirm Password',
+    'personal_info'     => 'Personal Information',
+    'member_since'      => 'Member Since',
+    'email_readonly'    => 'Email Address (Read-only)',
+    'email_help'        => 'Please contact Super Admin to change your assigned email address.',
+    'update_password'   => 'Update Password',
+    'google_calendar'   => 'Google Calendar',
+    'languages'         => [
+        'id' => 'Bahasa Indonesia',
+        'en' => 'English',
+        'zh' => '简体中文'
+    ],
+];

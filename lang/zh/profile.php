@@ -1,0 +1,26 @@
+<?php return [
+    'title'             => '用户个人资料',
+    'updated'           => '个人资料已更新。',
+    'password_updated'  => '密码已更新。',
+    'language_updated'  => '语言已更新。',
+    'name'              => '姓名',
+    'email'             => '邮箱',
+    'phone'             => '电话',
+    'language'          => '偏好语言',
+    'avatar'            => '个人照片',
+    'change_password'   => '更改密码',
+    'current_password'  => '当前密码',
+    'new_password'      => '新密码',
+    'confirm_password'  => '确认密码',
+    'personal_info'     => '个人信息',
+    'member_since'      => '注册日期',
+    'email_readonly'    => '邮箱地址 (只读)',
+    'email_help'        => '请联系超级管理员修改您的注册邮箱。',
+    'update_password'   => '更新密码',
+    'google_calendar'   => '谷歌日历',
+    'languages'         => [
+        'id' => '印尼语',
+        'en' => '英语',
+        'zh' => '简体中文'
+    ],
+];
