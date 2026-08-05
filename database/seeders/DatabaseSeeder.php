@@ -10,12 +10,12 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create admin user
-        User::firstOrCreate(
+        // Create or update admin user (User model automatically hashes 'password')
+        User::updateOrCreate(
             ['email' => 'admin@statusscheduler.com'],
             [
                 'name'     => 'Admin',
-                'password' => bcrypt('admin123'),
+                'password' => 'admin123',
             ]
         );
 
@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $this->command->info('✓ Admin user created: admin@statusscheduler.com / admin123');
+        $this->command->info('✓ Admin user updated: admin@statusscheduler.com / admin123');
         $this->command->info('✓ Default settings seeded.');
     }
 }
