@@ -44,10 +44,10 @@ class PublishStatus extends Command
     {
         $this->line("Processing post ID: {$post->id}");
 
-        $platforms = $post->platforms ?? [];
-        $mediaUrl  = $post->media_url;   // Full http URL for WhatsApp
-        $mediaPath = $post->media_path;  // Raw disk path for Late API upload
-        $caption   = $post->caption ?? '';
+        $platforms   = $post->platforms ?? [];
+        $mediaPath   = $post->media_path;  // Raw disk path
+        $caption     = $post->caption ?? '';
+        $contentType = $post->content_type ?? 'story';
 
         if (!$mediaPath) {
             $this->warn("Post ID {$post->id} has no media, marking as failed.");
@@ -55,39 +55,85 @@ class PublishStatus extends Command
             return;
         }
 
-        $errors = [];
-        $success = true;
+        $errors        = [];
+        $successCount  = 0;
+        $totalPlatforms = 0;
 
-        // -- WhatsApp Status (uses file binary upload, works on localhost) --
+        // -- WhatsApp Status (uses Node.js bridge on port 3000) --
         if (in_array('whatsapp_status', $platforms)) {
+            $totalPlatforms++;
             $result = $whatsAppService->sendStatus($mediaPath, $caption);
             if (!$result['success']) {
-                $errors[] = 'WhatsApp: ' . $result['message'];
-                $success  = false;
+                // Check if it's a connection error (bridge not running)
+                $isConnectionError = str_contains($result['message'], 'Bridge Exception') ||
+                                     str_contains($result['message'], 'port 3000') ||
+                                     str_contains($result['message'], 'connect');
+
+                if ($isConnectionError) {
+                    $this->warn("  ⚠ WhatsApp Bridge tidak aktif, dilewati: " . $result['message']);
+                    // Don't count as hard failure — bridge may simply be offline
+                    $errors[] = 'WhatsApp: ' . $result['message'];
+                } else {
+                    $this->error("  ✗ WhatsApp Status gagal: " . $result['message']);
+                    $errors[] = 'WhatsApp: ' . $result['message'];
+                    $totalPlatforms++; // Count as attempted
+                }
             } else {
+                $successCount++;
                 $this->info("  ✓ WhatsApp Status sent.");
             }
         }
 
-        // -- Late API (needs raw media_path for local file upload) --
-        $latePlatforms = array_filter($platforms, fn($p) => in_array($p, [
+        // -- Late API: Story platforms (Instagram Story, Facebook Story, TikTok) --
+        $lateStoryPlatforms = array_values(array_filter($platforms, fn($p) => in_array($p, [
             'instagram_story', 'facebook_story', 'tiktok_story'
-        ]));
+        ])));
 
-        if (!empty($latePlatforms)) {
-            $result = $lateService->sendStory(array_values($latePlatforms), $mediaPath, $caption);
+        if (!empty($lateStoryPlatforms)) {
+            $totalPlatforms++;
+            $result = $lateService->sendContent($lateStoryPlatforms, $mediaPath, $caption, 'story');
             if (!$result['success']) {
-                $errors[] = 'Late API: ' . $result['message'];
-                $success  = false;
+                $errors[] = 'Late API (Story): ' . $result['message'];
+                $this->error("  ✗ Late API Story gagal: " . $result['message']);
             } else {
-                $this->info("  ✓ Late API story posted: " . implode(', ', $latePlatforms));
+                $successCount++;
+                $this->info("  ✓ Late API story posted: " . implode(', ', $lateStoryPlatforms));
             }
         }
 
-        if ($success) {
-            $post->update(['status' => 'posted', 'error_message' => null]);
-            $this->info("  Post ID {$post->id} marked as POSTED.");
+        // -- Late API: Post platforms (Instagram Post, Facebook Post) --
+        $latePostPlatforms = array_values(array_filter($platforms, fn($p) => in_array($p, [
+            'instagram_post', 'facebook_post'
+        ])));
+
+        if (!empty($latePostPlatforms)) {
+            $totalPlatforms++;
+            $result = $lateService->sendContent($latePostPlatforms, $mediaPath, $caption, 'post');
+            if (!$result['success']) {
+                $errors[] = 'Late API (Post): ' . $result['message'];
+                $this->error("  ✗ Late API Post gagal: " . $result['message']);
+            } else {
+                $successCount++;
+                $this->info("  ✓ Late API post published: " . implode(', ', $latePostPlatforms));
+            }
+        }
+
+        // Mark as posted if at least one platform group succeeded
+        // (or if no platforms were selected but no hard errors)
+        $hasLateSuccess = $successCount > 0;
+        $onlyWaFailed   = !empty($errors) && $successCount > 0;
+
+        if ($successCount > 0) {
+            // At least one platform succeeded — mark as posted
+            $errorNote = !empty($errors) ? ' (Catatan: ' . implode(' | ', $errors) . ')' : null;
+            $post->update(['status' => 'posted', 'error_message' => $errorNote]);
+            $this->info("  Post ID {$post->id} marked as POSTED." . ($errorNote ? " (partial errors)" : ''));
+        } elseif ($totalPlatforms === 0) {
+            // No platform was selected
+            $post->update(['status' => 'failed', 'error_message' => 'Tidak ada platform dipilih']);
+            $this->error("  Post ID {$post->id}: No platform selected.");
         } else {
+            // All platforms failed
             $errorMsg = implode(' | ', $errors);
             $post->update(['status' => 'failed', 'error_message' => $errorMsg]);
             $this->error("  Post ID {$post->id} marked as FAILED: {$errorMsg}");

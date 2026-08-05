@@ -13,6 +13,7 @@ class Post extends Model
     protected $fillable = [
         'media_path',
         'caption',
+        'content_type',
         'platforms',
         'schedule_time',
         'status',

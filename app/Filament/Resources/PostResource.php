@@ -63,14 +63,35 @@ class PostResource extends Resource
 
                 Forms\Components\Section::make('Platform & Jadwal')
                     ->schema([
+                        Forms\Components\Select::make('content_type')
+                            ->label('Tipe Konten')
+                            ->options([
+                                'story'   => '📖 Story / Status',
+                                'post'    => '🖼️ Postingan (Feed)',
+                            ])
+                            ->default('story')
+                            ->required()
+                            ->live()
+                            ->helperText('Pilih apakah konten akan diposting sebagai Story atau Postingan di Feed'),
+
                         Forms\Components\CheckboxList::make('platforms')
                             ->label('Platform Tujuan')
-                            ->options([
-                                'whatsapp_status'  => '📱 WhatsApp Status',
-                                'instagram_story'  => '📸 Instagram Story',
-                                'facebook_story'   => '👤 Facebook Story',
-                                'tiktok_story'     => '🎵 TikTok Story',
-                            ])
+                            ->options(function (\Filament\Forms\Get $get) {
+                                $type = $get('content_type') ?? 'story';
+                                if ($type === 'post') {
+                                    return [
+                                        'instagram_post'  => '📸 Instagram Post (Feed)',
+                                        'facebook_post'   => '👤 Facebook Post (Feed)',
+                                        'tiktok_story'    => '🎵 TikTok Video',
+                                    ];
+                                }
+                                return [
+                                    'whatsapp_status'  => '📱 WhatsApp Status',
+                                    'instagram_story'  => '📸 Instagram Story',
+                                    'facebook_story'   => '👤 Facebook Story',
+                                    'tiktok_story'     => '🎵 TikTok Story',
+                                ];
+                            })
                             ->required()
                             ->columns(2)
                             ->gridDirection('row'),
@@ -116,15 +137,23 @@ class PostResource extends Resource
                     ->tooltip(fn($record) => $record->caption)
                     ->searchable(),
 
+                Tables\Columns\TextColumn::make('content_type')
+                    ->label('Tipe')
+                    ->badge()
+                    ->color(fn($state) => $state === 'post' ? 'info' : 'primary')
+                    ->formatStateUsing(fn($state) => $state === 'post' ? '🖼️ Postingan' : '📖 Story'),
+
                 Tables\Columns\TextColumn::make('platforms')
                     ->label('Platform')
                     ->formatStateUsing(function ($state) {
                         if (!is_array($state)) return '-';
                         $icons = [
                             'whatsapp_status'  => '📱 WhatsApp',
-                            'instagram_story'  => '📸 Instagram',
-                            'facebook_story'   => '👤 Facebook',
+                            'instagram_story'  => '📸 IG Story',
+                            'facebook_story'   => '👤 FB Story',
                             'tiktok_story'     => '🎵 TikTok',
+                            'instagram_post'   => '📸 IG Post',
+                            'facebook_post'    => '👤 FB Post',
                         ];
                         return collect($state)
                             ->map(fn($p) => $icons[$p] ?? $p)
@@ -177,10 +206,10 @@ class PostResource extends Resource
                     ->modalHeading('Publish Status Sekarang?')
                     ->modalDescription('Konten akan langsung dipublikasikan ke platform yang dipilih.')
                     ->action(function (Post $record) {
-                        $platforms = $record->platforms ?? [];
-                        $mediaUrl  = $record->media_url;    // Full URL: http://localhost:8000/storage/status/...
-                        $mediaPath = $record->media_path;   // Raw path: status/filename.ext
-                        $caption   = $record->caption ?? '';
+                        $platforms   = $record->platforms ?? [];
+                        $mediaPath   = $record->media_path;   // Raw path: status/filename.ext
+                        $caption     = $record->caption ?? '';
+                        $contentType = $record->content_type ?? 'story';
 
                         if (!$mediaPath) {
                             Notification::make()
@@ -190,36 +219,71 @@ class PostResource extends Resource
                             return;
                         }
 
-                        $errors  = [];
-                        $success = true;
+                        $errors       = [];
+                        $successCount = 0;
+                        $totalPlatforms = 0;
 
-                        // WhatsApp via Fonnte (uses file binary upload, works on localhost)
+                        // WhatsApp via Node.js Bridge (port 3000)
                         if (in_array('whatsapp_status', $platforms)) {
+                            $totalPlatforms++;
                             $result = app(WhatsAppService::class)->sendStatus($mediaPath, $caption);
                             if (!$result['success']) {
-                                $errors[] = 'WhatsApp: ' . $result['message'];
-                                $success  = false;
+                                $isConnectionError = str_contains($result['message'], 'Bridge Exception') ||
+                                                     str_contains($result['message'], 'port 3000') ||
+                                                     str_contains($result['message'], 'connect');
+                                if ($isConnectionError) {
+                                    // Bridge offline — treat as warning, not hard failure
+                                    $errors[] = '⚠ WhatsApp Bridge tidak aktif: ' . $result['message'];
+                                } else {
+                                    $errors[] = 'WhatsApp: ' . $result['message'];
+                                }
+                            } else {
+                                $successCount++;
                             }
                         }
 
-                        // Late API (needs raw media_path for local file upload)
-                        $latePlatforms = array_values(array_filter($platforms, fn($p) => in_array($p, [
+                        // Late API (Instagram Story, Facebook Story, TikTok Story)
+                        $lateStoryPlatforms = array_values(array_filter($platforms, fn($p) => in_array($p, [
                             'instagram_story', 'facebook_story', 'tiktok_story'
                         ])));
 
-                        if (!empty($latePlatforms)) {
-                            $result = app(LateService::class)->sendStory($latePlatforms, $mediaPath, $caption);
+                        if (!empty($lateStoryPlatforms)) {
+                            $totalPlatforms++;
+                            $result = app(LateService::class)->sendContent($lateStoryPlatforms, $mediaPath, $caption, 'story');
                             if (!$result['success']) {
-                                $errors[] = 'Late API: ' . $result['message'];
-                                $success  = false;
+                                $errors[] = 'Late API (Story): ' . $result['message'];
+                            } else {
+                                $successCount++;
                             }
                         }
 
-                        if ($success) {
-                            $record->update(['status' => 'posted', 'error_message' => null]);
+                        // Late API (Instagram Post, Facebook Post)
+                        $latePostPlatforms = array_values(array_filter($platforms, fn($p) => in_array($p, [
+                            'instagram_post', 'facebook_post',
+                        ])));
+
+                        if (!empty($latePostPlatforms)) {
+                            $totalPlatforms++;
+                            $result = app(LateService::class)->sendContent($latePostPlatforms, $mediaPath, $caption, 'post');
+                            if (!$result['success']) {
+                                $errors[] = 'Late API (Post): ' . $result['message'];
+                            } else {
+                                $successCount++;
+                            }
+                        }
+
+                        if ($successCount > 0) {
+                            $errorNote = !empty($errors) ? implode("\n", $errors) : null;
+                            $record->update(['status' => 'posted', 'error_message' => $errorNote]);
                             Notification::make()
                                 ->title('Berhasil dipublikasikan!')
+                                ->body($errorNote ? 'Catatan: ' . implode(' | ', $errors) : null)
                                 ->success()
+                                ->send();
+                        } elseif ($totalPlatforms === 0) {
+                            Notification::make()
+                                ->title('Tidak ada platform dipilih!')
+                                ->danger()
                                 ->send();
                         } else {
                             $record->update(['status' => 'failed', 'error_message' => implode(' | ', $errors)]);

@@ -22,13 +22,23 @@ class LateService
 
     /**
      * Send story to Late API platforms.
-     *
-     * @param array  $platforms    e.g. ['instagram_story', 'facebook_story', 'tiktok_story']
-     * @param string $mediaPath   The relative path stored in DB (e.g. 'status/filename.jpg')
-     * @param string $caption
-     * @return array ['success' => bool, 'message' => string]
+     * Alias for backward compatibility.
      */
     public function sendStory(array $platforms, string $mediaPath, string $caption): array
+    {
+        return $this->sendContent($platforms, $mediaPath, $caption, 'story');
+    }
+
+    /**
+     * Send content (story or post) to Late API platforms.
+     *
+     * @param array  $platforms    e.g. ['instagram_story', 'facebook_story', 'instagram_post', 'facebook_post']
+     * @param string $mediaPath   The relative path stored in DB (e.g. 'status/filename.jpg')
+     * @param string $caption
+     * @param string $contentType 'story' | 'post'
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function sendContent(array $platforms, string $mediaPath, string $caption, string $contentType = 'story'): array
     {
         if (empty($platforms)) {
             return ['success' => false, 'message' => 'No platforms specified'];
@@ -38,8 +48,9 @@ class LateService
         $accounts = $this->getAccounts();
 
         Log::info("Late API: Found " . count($accounts) . " accounts", [
-            'accounts'   => collect($accounts)->map(fn($a) => ['_id' => $a['_id'] ?? null, 'platform' => $a['platform'] ?? null])->toArray(),
-            'profileId'  => $this->profileId,
+            'accounts'    => collect($accounts)->map(fn($a) => ['_id' => $a['_id'] ?? null, 'platform' => $a['platform'] ?? null])->toArray(),
+            'profileId'   => $this->profileId,
+            'contentType' => $contentType,
         ]);
 
         if (empty($accounts)) {
@@ -48,17 +59,16 @@ class LateService
 
         $postPlatforms = [];
         foreach ($platforms as $platform) {
-            // Mapping: instagram_story -> instagram, facebook_story -> facebook, tiktok_story -> tiktok
-            $apiPlatform = str_replace('_story', '', $platform);
-            // Also handle whatsapp_status -> whatsapp
-            $apiPlatform = str_replace('_status', '', $apiPlatform);
+            // Mapping: instagram_story -> instagram, facebook_story -> facebook, instagram_post -> instagram, etc.
+            $apiPlatform = str_replace(['_story', '_post', '_status'], '', $platform);
 
             $account = collect($accounts)->first(fn($a) => ($a['platform'] ?? '') === $apiPlatform);
 
             if ($account) {
                 $postPlatforms[] = [
-                    'platform'  => $apiPlatform,
-                    'accountId' => $account['_id'],
+                    'platform'    => $apiPlatform,
+                    'accountId'   => $account['_id'],
+                    'contentType' => $contentType,
                 ];
             } else {
                 Log::warning("No account found for platform: {$apiPlatform}", [
@@ -72,7 +82,7 @@ class LateService
         }
 
         // 2. Upload media first, then create the post
-        return $this->createPost($postPlatforms, $mediaPath, $caption);
+        return $this->createPost($postPlatforms, $mediaPath, $caption, $contentType);
     }
 
     private function getAccounts(): array
@@ -106,7 +116,7 @@ class LateService
         }
     }
 
-    private function createPost(array $postPlatforms, string $mediaPath, string $caption): array
+    private function createPost(array $postPlatforms, string $mediaPath, string $caption, string $contentType = 'story'): array
     {
         try {
             // 1. Upload local media to Late API storage (via presigned URL)
@@ -117,40 +127,56 @@ class LateService
             }
 
             // 2. Prepare Platforms array and Media Items
-            $isVideo = str_contains($mediaPath, '.mp4') || str_contains($mediaPath, '.mov');
+            $isVideo   = str_contains($mediaPath, '.mp4') || str_contains($mediaPath, '.mov');
             $mediaType = $isVideo ? 'video' : 'image';
-            
+
             $platforms = [];
             $hasTiktok = false;
             foreach ($postPlatforms as $pp) {
+                $platformName = $pp['platform'];
+                $ct           = $pp['contentType'] ?? $contentType; // per-platform override
+
                 $target = [
-                    'platform'  => $pp['platform'],
-                    'accountId' => $pp['accountId'],
+                    'platform'             => $platformName,
+                    'accountId'            => $pp['accountId'],
                     'platformSpecificData' => [],
                 ];
 
                 // Instagram Story
-                if ($pp['platform'] === 'instagram') {
+                if ($platformName === 'instagram' && $ct === 'story') {
                     $target['platformSpecificData'] = [
-                        'contentType' => 'story',
-                        'publish_to_story' => true, // Fallback common parameter
+                        'contentType'      => 'story',
+                        'publish_to_story' => true,
+                    ];
+                }
+
+                // Instagram Post (Feed)
+                if ($platformName === 'instagram' && $ct === 'post') {
+                    $target['platformSpecificData'] = [
+                        'contentType' => 'feed',
                     ];
                 }
 
                 // Facebook Story
-                if ($pp['platform'] === 'facebook') {
+                if ($platformName === 'facebook' && $ct === 'story') {
                     $target['platformSpecificData'] = [
                         'contentType' => 'story',
                     ];
                 }
 
-                // TikTok Story (Attempt)
-                if ($pp['platform'] === 'tiktok') {
+                // Facebook Post (Feed)
+                if ($platformName === 'facebook' && $ct === 'post') {
+                    $target['platformSpecificData'] = [
+                        'contentType' => 'feed',
+                    ];
+                }
+
+                // TikTok
+                if ($platformName === 'tiktok') {
                     $hasTiktok = true;
                     $target['platformSpecificData'] = [
                         'contentType' => 'story',
                     ];
-                    // Also some versions put settings in its own object
                     $target['tiktokSettings'] = [
                         'content_preview_confirmed' => true,
                         'express_consent_given'     => true,

@@ -28,3 +28,5 @@ Thumbs.db
 /wa-bridge/qr_val.txt
 /tunnel.log
 /docker-compose.yml
+/.antigravity
+/CLAUDE.md

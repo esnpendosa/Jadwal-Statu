@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Rosandi\WAHA\Facades\Waha;
 
 class WhatsAppService
 {

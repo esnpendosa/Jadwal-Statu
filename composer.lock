@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4dc8b3c0eaeb69e14eef02b22e3273a1",
+    "content-hash": "d06cf5f6e284742b7ceb6933570202c2",
     "packages": [
         {
             "name": "andrirosandi/laravel-waha",
             "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/andrirosandi/laravel-waha.git",
+                "reference": "2d468f248db81ed2afb4d6e390903219c0d6e084"
+            },
             "dist": {
-                "type": "path",
-                "url": "../laravel-waha",
-                "reference": "aae578f5c9c142510de3908a3a36574e6a52156a"
+                "type": "zip",
+                "url": "https://api.github.com/repos/andrirosandi/laravel-waha/zipball/2d468f248db81ed2afb4d6e390903219c0d6e084",
+                "reference": "2d468f248db81ed2afb4d6e390903219c0d6e084",
+                "shasum": ""
             },
             "type": "package",
             "extra": {
@@ -27,6 +33,7 @@
                     "Rosandi\\WAHA\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -36,9 +43,11 @@
                 }
             ],
             "description": "This Laravel package integrates with WAHA - WhatsApp HTTP API, allowing you to send and receive WhatsApp messages via HTTP requests. It is not an official WhatsApp API.",
-            "transport-options": {
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/andrirosandi/laravel-waha/issues",
+                "source": "https://github.com/andrirosandi/laravel-waha/tree/v1.0.0"
+            },
+            "time": "2025-02-18T08:27:48+00:00"
         },
         {
             "name": "anourvalar/eloquent-serialize",
@@ -10097,14 +10106,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "andrirosandi/laravel-waha": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.2"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.3.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
