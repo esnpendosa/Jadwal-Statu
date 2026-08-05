@@ -142,6 +142,10 @@ APP_DEBUG=true
 # agar preview gambar tidak kena CORS error
 APP_URL=http://127.0.0.1:8000
 
+# ⚠️ PENTING: Set timezone ke Asia/Jakarta (WIB)
+# agar jadwal posting otomatis berjalan di waktu yang tepat
+APP_TIMEZONE=Asia/Jakarta
+
 # Database SQLite (tidak perlu konfigurasi tambahan)
 DB_CONNECTION=sqlite
 
@@ -160,7 +164,9 @@ FONNTE_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxx
 FONNTE_API_URL=https://api.fonnte.com/send
 ```
 
-> ⚠️ **PENTING:** `APP_URL` **wajib** menggunakan `http://127.0.0.1:8000`. Jika menggunakan `http://localhost`, Filament FileUpload akan mengalami **CORS error** saat preview gambar.
+> ⚠️ **PENTING #1:** `APP_URL` **wajib** `http://127.0.0.1:8000` — mencegah CORS error saat preview gambar.
+
+> ⚠️ **PENTING #2:** `APP_TIMEZONE` **wajib** `Asia/Jakarta` — tanpa ini, jadwal posting akan meleset 7 jam (terlambat dipublish karena perbandingan UTC vs WIB).
 
 ### 3. Konfigurasi Database
 
