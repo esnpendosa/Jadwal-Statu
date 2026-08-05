@@ -1,20 +1,18 @@
-import {
-    default as makeWASocket,
+const {
+    default: makeWASocket,
     useMultiFileAuthState,
     delay,
     DisconnectReason,
     fetchLatestBaileysVersion
-} from '@whiskeysockets/baileys';
-import pino from 'pino';
-import qrcode from 'qrcode-terminal';
-import express from 'express';
-import { json as bodyParserJson } from 'express';
-import { existsSync, readFileSync, rmSync } from 'fs';
-import { extname } from 'path';
-import { createRequire } from 'module';
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-app.use(bodyParserJson());
+app.use(express.json());
 
 let sock;
 let isConnected = false;
@@ -32,7 +30,7 @@ async function connectToWhatsApp() {
             version,
             auth: state,
             logger: pino({ level: 'silent' }),
-            printQRInTerminal: true,
+            printQRInTerminal: false,
             browser: ['Ubuntu', 'Chrome', '20.0.04']
         });
 
@@ -69,12 +67,9 @@ async function connectToWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                console.log('RAW_QR_START');
-                console.log(qr);
-                console.log('RAW_QR_END');
-                console.log('\n--- SCAN QR CODE INI ---');
+                console.log('\n--- SCAN QR CODE INI DENGAN WHATSAPP ---');
                 qrcode.generate(qr, { small: true });
-                console.log('------------------------\n');
+                console.log('----------------------------------------\n');
             }
 
             if (connection === 'close') {
@@ -85,7 +80,7 @@ async function connectToWhatsApp() {
 
                 if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Sesi login kedaluwarsa. Menghapus folder sesi...');
-                    rmSync('auth_info_baileys', { recursive: true, force: true });
+                    fs.rmSync('auth_info_baileys', { recursive: true, force: true });
                     console.log('Silakan jalankan ulang script untuk SCAN QR BARU.');
                 }
 
@@ -111,22 +106,20 @@ app.post('/send-status', async (req, res) => {
     }
 
     try {
-        if (!existsSync(filePath)) {
+        if (!fs.existsSync(filePath)) {
             return res.status(404).json({ success: false, message: 'File not found: ' + filePath });
         }
 
-        const buffer = readFileSync(filePath);
-        const ext = extname(filePath).toLowerCase();
+        const buffer = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
         const isVideo = ext === '.mp4' || ext === '.mov';
 
         const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
-        console.log(`Delay ${randomDelay / 1000}s...`);
+        console.log(`Delay ${randomDelay / 1000}s sebelum kirim...`);
         await delay(randomDelay);
 
-        // WhatsApp Status requires broadcast: true and a list of JIDs (contacts)
         let jidList = Array.from(contacts);
-
-        console.log(`Sending to ${jidList.length} contacts...`);
+        console.log(`Mengirim ke ${jidList.length} kontak...`);
 
         await sock.sendMessage('status@broadcast', {
             [isVideo ? 'video' : 'image']: buffer,
@@ -139,7 +132,7 @@ app.post('/send-status', async (req, res) => {
         console.log('Status terkirim!');
         res.json({ success: true, message: 'Status sent!' });
     } catch (err) {
-        console.error('Error:', err);
+        console.error('Error kirim status:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -150,7 +143,8 @@ app.get('/', (req, res) => {
             <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
                 <h1 style="color: #25D366;">WhatsApp Bridge is Running</h1>
                 <p>Status: <strong>${isConnected ? '✅ Connected' : '⏳ Connecting...'}</strong></p>
-                <p>To send a status, use a POST request to <code>/send-status</code>.</p>
+                <p>Kontak ter-track: <strong>${contacts.size}</strong></p>
+                <p>Kirim status via POST ke <code>/send-status</code></p>
             </body>
         </html>
     `);
