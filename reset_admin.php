@@ -4,47 +4,38 @@ require __DIR__ . '/vendor/autoload.php';
 $app = require __DIR__ . '/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
+use App\Models\Post;
+use App\Models\Setting;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 
-echo "=== DIAGNOSTIK LENGKAP HASIL RESET ===" . PHP_EOL;
+echo "=== DIAGNOSTIK PROSES MIGRASI & TABEL ===" . PHP_EOL;
 
 try {
-    echo "DB Connection : " . config('database.default') . PHP_EOL;
-    echo "SESSION_DRIVER: " . config('session.driver') . PHP_EOL;
-    echo "SESSION_PATH  : " . config('session.files') . PHP_EOL;
-    echo "APP_URL       : " . config('app.url') . PHP_EOL;
-    echo "APP_TIMEZONE  : " . config('app.timezone') . PHP_EOL;
+    echo "1. Menjalankan migrasi database..." . PHP_EOL;
+    Artisan::call('migrate', ['--force' => true]);
+    echo Artisan::output();
+
+    echo "2. Cek ketersediaan tabel:" . PHP_EOL;
+    echo "   - users    : " . (Schema::hasTable('users') ? 'ADA ✅' : 'TIDAK ADA ❌') . PHP_EOL;
+    echo "   - posts    : " . (Schema::hasTable('posts') ? 'ADA ✅' : 'TIDAK ADA ❌') . PHP_EOL;
+    echo "   - settings : " . (Schema::hasTable('settings') ? 'ADA ✅' : 'TIDAK ADA ❌') . PHP_EOL;
     echo PHP_EOL;
 
-    // Check sessions table if database driver is used
-    if (config('session.driver') === 'database') {
-        echo "Cek tabel 'sessions' di Database MySQL: " . (Schema::hasTable('sessions') ? 'ADA ✅' : 'TIDAK ADA! ❌ (Jalankan php artisan migrate)') . PHP_EOL;
-    } elseif (config('session.driver') === 'file') {
-        $sessDir = config('session.files');
-        echo "Cek folder session file: " . (is_dir($sessDir) && is_writable($sessDir) ? 'WRITABLE ✅' : 'TIDAK BISA DITULIS! ❌') . PHP_EOL;
-    }
-
-    // Force set user password
-    $user = User::where('email', 'admin@statusscheduler.com')->first();
-    if (!$user) {
-        $user = new User();
-        $user->email = 'admin@statusscheduler.com';
-        $user->name = 'Admin';
-    }
-    
-    $user->setRawAttributes(array_merge($user->getAttributes(), [
-        'password' => Hash::make('admin123')
-    ]));
-    $user->save();
-
+    echo "3. Cek jumlah data:" . PHP_EOL;
+    echo "   - User count : " . User::count() . PHP_EOL;
+    echo "   - Post count : " . Post::count() . PHP_EOL;
+    echo "   - Setting    : " . Setting::count() . PHP_EOL;
     echo PHP_EOL;
-    echo "✓ User ID       : " . $user->id . PHP_EOL;
-    echo "✓ User Email    : " . $user->email . PHP_EOL;
-    echo "✓ Test Password : " . (Hash::check('admin123', $user->password) ? 'MATCH (admin123) ✅' : 'FAILED ❌') . PHP_EOL;
+
+    echo "4. Membersihkan cache tampilan & filament..." . PHP_EOL;
+    Artisan::call('view:clear');
+    Artisan::call('filament:optimize-clear');
+    Artisan::call('icons:clear');
+    echo "SELESAI! ✅" . PHP_EOL;
 
 } catch (\Throwable $e) {
     echo "ERROR: " . $e->getMessage() . PHP_EOL;
+    echo $e->getTraceAsString() . PHP_EOL;
 }
