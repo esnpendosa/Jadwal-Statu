@@ -10,7 +10,7 @@ SET "PATH=%PATH%;C:\laragon\bin\php\php-8.2.29-Win32-vs16-x64;C:\laragon\bin\nod
 echo.
 echo [1/4] Starting WhatsApp Bridge (Baileys)...
 cd wa-bridge
-start "WhatsApp Bridge" cmd /k "SET PATH=%PATH%;C:\laragon\bin\nodejs\node-v18.16.0-win-x64 && node server.js"
+start "WhatsApp Bridge" cmd /k "SET PATH=%PATH%;C:\laragon\bin\nodejs\node-v18.16.0-win-x64 && node --experimental-global-webcrypto server.js"
 cd ..
 
 echo.

@@ -1,15 +1,22 @@
-const {
-    default: makeWASocket,
+// Polyfill Web Crypto API untuk Node.js 18.x
+// (tersedia native di Node.js 19+, di 18.x perlu ini)
+import { webcrypto } from 'node:crypto';
+if (!globalThis.crypto) {
+    globalThis.crypto = webcrypto;
+}
+
+import {
+    default as makeWASocket,
     useMultiFileAuthState,
     delay,
     DisconnectReason,
     fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const qrcode = require('qrcode-terminal');
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
+} from '@whiskeysockets/baileys';
+import pino from 'pino';
+import qrcode from 'qrcode-terminal';
+import express from 'express';
+import { existsSync, readFileSync, rmSync } from 'fs';
+import { extname } from 'path';
 
 const app = express();
 app.use(express.json());
@@ -30,7 +37,6 @@ async function connectToWhatsApp() {
             version,
             auth: state,
             logger: pino({ level: 'silent' }),
-            printQRInTerminal: false,
             browser: ['Ubuntu', 'Chrome', '20.0.04']
         });
 
@@ -80,7 +86,7 @@ async function connectToWhatsApp() {
 
                 if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Sesi login kedaluwarsa. Menghapus folder sesi...');
-                    fs.rmSync('auth_info_baileys', { recursive: true, force: true });
+                    rmSync('auth_info_baileys', { recursive: true, force: true });
                     console.log('Silakan jalankan ulang script untuk SCAN QR BARU.');
                 }
 
@@ -106,12 +112,12 @@ app.post('/send-status', async (req, res) => {
     }
 
     try {
-        if (!fs.existsSync(filePath)) {
+        if (!existsSync(filePath)) {
             return res.status(404).json({ success: false, message: 'File not found: ' + filePath });
         }
 
-        const buffer = fs.readFileSync(filePath);
-        const ext = path.extname(filePath).toLowerCase();
+        const buffer = readFileSync(filePath);
+        const ext = extname(filePath).toLowerCase();
         const isVideo = ext === '.mp4' || ext === '.mov';
 
         const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
