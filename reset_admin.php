@@ -6,45 +6,39 @@ $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\Artisan;
 
-echo "=== PERBAIKAN FILE STORAGE & PERMISSION ===" . PHP_EOL;
+echo "=== FIX SYMLINK STORAGE & PERMISSION ===" . PHP_EOL;
 
 try {
-    echo "1. Re-link Storage..." . PHP_EOL;
-    Artisan::call('storage:link', ['--force' => true]);
-    echo Artisan::output();
-
-    echo "2. Publish asset fisik Livewire..." . PHP_EOL;
-    Artisan::call('livewire:publish', ['--assets' => true]);
-    Artisan::call('filament:assets');
-
-    $targetDir = public_path('livewire');
-    $sourceDir = public_path('vendor/livewire');
-    
-    if (!file_exists($targetDir)) {
-        mkdir($targetDir, 0755, true);
-    }
-    
-    if (file_exists($sourceDir)) {
-        foreach (scandir($sourceDir) as $file) {
-            if ($file !== '.' && $file !== '..') {
-                copy($sourceDir . '/' . $file, $targetDir . '/' . $file);
-            }
+    $publicStorage = public_path('storage');
+    if (is_link($publicStorage) || file_exists($publicStorage)) {
+        echo "1. Menghapus symlink storage lama..." . PHP_EOL;
+        if (str_starts_with(PHP_OS, 'WIN')) {
+            @unlink($publicStorage);
+        } else {
+            exec("rm -rf " . escapeshellarg($publicStorage));
         }
     }
 
-    // Ensure status directory exists
+    echo "2. Membuat symlink storage baru..." . PHP_EOL;
+    Artisan::call('storage:link', ['--force' => true]);
+    echo Artisan::output();
+
     $statusDir = storage_path('app/public/status');
     if (!file_exists($statusDir)) {
         mkdir($statusDir, 0777, true);
     }
 
-    echo "3. Clear Cache..." . PHP_EOL;
+    echo "3. Cek file media di storage:" . PHP_EOL;
+    $files = glob(storage_path('app/public/status/*'));
+    echo "   Ditemukan " . count($files) . " file di storage/app/public/status/" . PHP_EOL;
+    foreach (array_slice($files, 0, 5) as $f) {
+        echo "   - " . basename($f) . " (" . filesize($f) . " bytes)" . PHP_EOL;
+    }
+
     Artisan::call('config:clear');
-    Artisan::call('route:clear');
     Artisan::call('view:clear');
-    Artisan::call('filament:optimize-clear');
-    
-    echo PHP_EOL . "SELESAI! ✅ Silakan jalankan chmod di terminal." . PHP_EOL;
+
+    echo PHP_EOL . "SELESAI! ✅" . PHP_EOL;
 
 } catch (\Throwable $e) {
     echo "ERROR: " . $e->getMessage() . PHP_EOL;
