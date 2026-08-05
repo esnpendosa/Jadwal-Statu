@@ -1,19 +1,20 @@
-const {
-    default: makeWASocket,
+import {
+    default as makeWASocket,
     useMultiFileAuthState,
     delay,
     DisconnectReason,
     fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const qrcode = require('qrcode-terminal');
-const express = require('express');
-const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
+} from '@whiskeysockets/baileys';
+import pino from 'pino';
+import qrcode from 'qrcode-terminal';
+import express from 'express';
+import { json as bodyParserJson } from 'express';
+import { existsSync, readFileSync, rmSync } from 'fs';
+import { extname } from 'path';
+import { createRequire } from 'module';
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParserJson());
 
 let sock;
 let isConnected = false;
@@ -77,14 +78,14 @@ async function connectToWhatsApp() {
             }
 
             if (connection === 'close') {
-                const statusCode = (lastDisconnect.error)?.output?.statusCode;
+                const statusCode = (lastDisconnect?.error)?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 console.log(`Connection closed (Reason: ${statusCode}). Reconnecting: ${shouldReconnect}`);
                 isConnected = false;
 
                 if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Sesi login kedaluwarsa. Menghapus folder sesi...');
-                    fs.rmSync('auth_info_baileys', { recursive: true, force: true });
+                    rmSync('auth_info_baileys', { recursive: true, force: true });
                     console.log('Silakan jalankan ulang script untuk SCAN QR BARU.');
                 }
 
@@ -110,12 +111,12 @@ app.post('/send-status', async (req, res) => {
     }
 
     try {
-        if (!fs.existsSync(filePath)) {
+        if (!existsSync(filePath)) {
             return res.status(404).json({ success: false, message: 'File not found: ' + filePath });
         }
 
-        const buffer = fs.readFileSync(filePath);
-        const ext = path.extname(filePath).toLowerCase();
+        const buffer = readFileSync(filePath);
+        const ext = extname(filePath).toLowerCase();
         const isVideo = ext === '.mp4' || ext === '.mov';
 
         const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
@@ -123,7 +124,6 @@ app.post('/send-status', async (req, res) => {
         await delay(randomDelay);
 
         // WhatsApp Status requires broadcast: true and a list of JIDs (contacts)
-        // If contacts are still empty, we will try to fetch some from the store or use a broader broadcast
         let jidList = Array.from(contacts);
 
         console.log(`Sending to ${jidList.length} contacts...`);
@@ -149,7 +149,7 @@ app.get('/', (req, res) => {
         <html>
             <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
                 <h1 style="color: #25D366;">WhatsApp Bridge is Running</h1>
-                <p>Status: <strong>${isConnected ? 'Connected' : 'Connecting...'}</strong></p>
+                <p>Status: <strong>${isConnected ? '✅ Connected' : '⏳ Connecting...'}</strong></p>
                 <p>To send a status, use a POST request to <code>/send-status</code>.</p>
             </body>
         </html>
